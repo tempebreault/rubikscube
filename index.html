@@ -149,6 +149,8 @@
     afterimage.uniforms["damp"].value = 0.88; // strength of trail
     composer.addPass(renderPass);
     composer.addPass(afterimage);
+    // Ensure composer has the correct size at startup
+    composer.setSize(window.innerWidth, window.innerHeight);
 
     const contrailsToggle = document.getElementById('contrails');
 
