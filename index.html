@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>INSANE Rubik’s Cube — Web Game</title>
+  <style>
+    :root{--bg:#0b0d10;--panel:#11141a;--accent:#5ee1ff;--text:#e6eef7;--muted:#7f8da3}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:radial-gradient(1000px 700px at 70% 10%,#111a25,#0b0d10 60%);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"}
+    #app{position:fixed;inset:0;display:grid;grid-template-columns:1fr;grid-template-rows:1fr}
+    canvas{display:block}
+    .hud{position:fixed;top:12px;left:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;z-index:10}
+    .panel{backdrop-filter:blur(6px);background:linear-gradient(180deg,rgba(17,20,26,.86),rgba(17,20,26,.72));border:1px solid rgba(255,255,255,.08);box-shadow:0 12px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);border-radius:14px;padding:10px 12px}
+    .title{font-weight:800;letter-spacing:.5px;font-size:14px;display:flex;align-items:center;gap:8px}
+    .title .dot{width:8px;height:8px;border-radius:50%;background:conic-gradient(from 0deg, #00f5ff, #69f, #00f5ff);box-shadow:0 0 14px #5ee1ff}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    button, .toggle {cursor:pointer;border:1px solid rgba(255,255,255,.12);background:#141925;color:var(--text);padding:8px 10px;border-radius:12px;font-weight:600;font-size:12px;letter-spacing:.2px;transition:.22s ease;box-shadow:inset 0 0 0 0 rgba(94,225,255,.25)}
+    button:hover, .toggle:hover{transform:translateY(-1px);box-shadow:inset 0 0 0 1px rgba(94,225,255,.25), 0 8px 20px rgba(0,0,0,.25)}
+    button:active{transform:translateY(0)}
+    .toggle input{appearance:none;width:0;height:0;position:absolute}
+    .toggle{display:inline-flex;align-items:center;gap:8px;position:relative}
+    .toggle .pill{width:36px;height:20px;border-radius:999px;background:#20283a;position:relative}
+    .toggle .knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#9cb3d6;transition:.2s ease}
+    .toggle input:checked + .pill{background:linear-gradient(90deg,#1a9cff,#5ee1ff)}
+    .toggle input:checked + .pill .knob{left:18px;background:white}
+    .movebar{display:flex;gap:6px;flex-wrap:wrap}
+    .kbd{padding:2px 6px;border-radius:6px;background:#0f1320;border:1px solid rgba(255,255,255,.12);font-family:ui-monospace,Menlo,Consolas,monospace}
+    .footer{position:fixed;right:12px;bottom:12px;z-index:10;opacity:.9}
+    .help{font-size:12px;color:var(--muted);line-height:1.5}
+    .help strong{color:#bcd7ff}
+    .hud .section{min-width:260px}
+    .select{appearance:none;background:#141925;border:1px solid rgba(255,255,255,.12);color:var(--text);padding:8px 10px;border-radius:12px}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div class="hud">
+    <div class="panel section">
+      <div class="title"><span class="dot"></span> INSANE Rubik’s Cube</div>
+      <div class="controls" style="margin-top:10px">
+        <button id="scramble">Scramble</button>
+        <button id="reset">Reset</button>
+        <label class="toggle" title="Lock the camera to a face and enable easy moves">
+          <input id="lockCam" type="checkbox" />
+          <span class="pill"><span class="knob"></span></span>
+          Lock Camera
+        </label>
+        <label class="toggle" title="Afterimage trail while moving (wind contrail)">
+          <input id="contrails" type="checkbox" checked />
+          <span class="pill"><span class="knob"></span></span>
+          Contrails
+        </label>
+        <select id="lockedView" class="select" title="When locked, snap to this view">
+          <option value="front" selected>Front</option>
+          <option value="right">Right</option>
+          <option value="back">Back</option>
+          <option value="left">Left</option>
+          <option value="up">Up</option>
+          <option value="down">Down</option>
+        </select>
+      </div>
+      <div style="margin-top:8px" class="movebar">
+        <button data-move="U">U</button>
+        <button data-move="U'">U'</button>
+        <button data-move="D">D</button>
+        <button data-move="D'">D'</button>
+        <button data-move="L">L</button>
+        <button data-move="L'">L'</button>
+        <button data-move="R">R</button>
+        <button data-move="R'">R'</button>
+        <button data-move="F">F</button>
+        <button data-move="F'">F'</button>
+        <button data-move="B">B</button>
+        <button data-move="B'">B'</button>
+      </div>
+    </div>
+    <div class="panel section">
+      <div class="title">How to play</div>
+      <div class="help" style="margin-top:6px">
+        <div>• Drag to orbit. Scroll to zoom. Hold <span class="kbd">Shift</span> to pan.</div>
+        <div>• Toggle <strong>Lock Camera</strong> to snap to faces for classic moves.</div>
+        <div>• Keyboard: use <span class="kbd">U D L R F B</span> (+ <span class="kbd">'</span> for inverse).</div>
+        <div>• Hit <strong>Scramble</strong>, then solve!</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer panel">
+    <div class="help">Built with Three.js. Afterimage trails create the wind “swift” contrail while layers spin.
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    import { EffectComposer } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/RenderPass.js';
+    import { AfterimagePass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/AfterimagePass.js';
+
+    // ===== Scene & Renderer =====
+    const app = document.getElementById('app');
+    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    app.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+
+    // Subtle space fog
+    scene.fog = new THREE.FogExp2(0x0b0d10, 0.06);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 200);
+    camera.position.set(5.5, 5.5, 7.5);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 4.2;
+    controls.maxDistance = 18;
+
+    // Lighting
+    const hemi = new THREE.HemisphereLight(0xaad6ff, 0x10131a, 0.6);
+    scene.add(hemi);
+    const key = new THREE.DirectionalLight(0xffffff, 0.9);
+    key.position.set(3,5,4);
+    key.castShadow = false;
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0x7fd8ff, 0.5);
+    rim.position.set(-4,2,-6);
+    scene.add(rim);
+
+    // Floating dust for depth
+    const dust = new THREE.Group();
+    const dustGeo = new THREE.SphereGeometry(0.02, 8, 8);
+    const dustMat = new THREE.MeshBasicMaterial({ color:0x304860, transparent:true, opacity:0.25 });
+    for(let i=0;i<400;i++){
+      const m = new THREE.Mesh(dustGeo, dustMat);
+      m.position.set((Math.random()-0.5)*40, (Math.random()-0.5)*26, (Math.random()-0.5)*40);
+      dust.add(m);
+    }
+    scene.add(dust);
+
+    // ===== Postprocessing (Afterimage for contrails) =====
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    const afterimage = new AfterimagePass();
+    afterimage.uniforms["damp"].value = 0.88; // strength of trail
+    composer.addPass(renderPass);
+    composer.addPass(afterimage);
+
+    const contrailsToggle = document.getElementById('contrails');
+
+    // ===== Rubik's Cube Setup =====
+    const CUBE_SIZE = 3; // 3x3x3
+    const GAP = 0.04;
+    const CUBELET = 1;
+    const STICK = 0.94;
+
+    // Sticker colors (classic scheme):
+    const COLORS = {
+      U: 0xFFFFFF, // Up (white)
+      D: 0xFFFF00, // Down (yellow)
+      L: 0xFF8C00, // Left (orange)
+      R: 0xFF0000, // Right (red)
+      F: 0x00AA00, // Front (green)
+      B: 0x0000CC  // Back (blue)
+    };
+
+    const cubeGroup = new THREE.Group();
+    scene.add(cubeGroup);
+
+    // Create one cubelet with colored stickers
+    function makeCubelet(x, y, z){
+      const g = new THREE.BoxGeometry(STICK, STICK, STICK);
+
+      // Six materials with dark base; stickers added as planes for nice rim highlights
+      const baseMat = new THREE.MeshPhysicalMaterial({ color:0x0b0d10, roughness:0.6, metalness:0.0, clearcoat:0.4, clearcoatRoughness:0.6 });
+      const mats = [baseMat, baseMat, baseMat, baseMat, baseMat, baseMat];
+      const m = new THREE.Mesh(g, mats);
+      m.position.set(x, y, z);
+      m.userData.coord = new THREE.Vector3(x, y, z); // logical coord (integers -1..1)
+
+      // Create stickers (thin planes) if on outer layer
+      const sGeo = new THREE.PlaneGeometry(0.84, 0.84);
+      const stickers = [];
+      const addSticker = (face, color, pos, rot)=>{
+        const sm = new THREE.Mesh(sGeo, new THREE.MeshBasicMaterial({ color }));
+        sm.position.copy(pos);
+        sm.rotation.setFromVector3(rot);
+        sm.renderOrder = 2; // render above edges
+        // slight offset so no z-fighting
+        sm.translateZ(0.49);
+        m.add(sm);
+        stickers.push(sm);
+      };
+      const v3 = THREE.Vector3;
+
+      if (y === 1) addSticker('U', COLORS.U, new v3(0,0.5,0), new v3(-Math.PI/2,0,0));
+      if (y === -1) addSticker('D', COLORS.D, new v3(0,-0.5,0), new v3(Math.PI/2,0,0));
+      if (x === -1) addSticker('L', COLORS.L, new v3(-0.5,0,0), new v3(0,Math.PI/2,0));
+      if (x === 1) addSticker('R', COLORS.R, new v3(0.5,0,0), new v3(0,-Math.PI/2,0));
+      if (z === 1) addSticker('F', COLORS.F, new v3(0,0,0.5), new v3(0,0,0));
+      if (z === -1) addSticker('B', COLORS.B, new v3(0,0,-0.5), new v3(0,Math.PI,0));
+
+      // Add a black shell to make seams
+      const shellGeo = new THREE.BoxGeometry(CUBELET - GAP, CUBELET - GAP, CUBELET - GAP);
+      const shellMat = new THREE.MeshStandardMaterial({ color:0x0a0c10, metalness:0.0, roughness:0.7 });
+      const shell = new THREE.Mesh(shellGeo, shellMat);
+      shell.scale.setScalar(1.02);
+      m.add(shell);
+
+      return m;
+    }
+
+    // Build 3x3x3 cube
+    const cubelets = [];
+    for(let x=-1;x<=1;x++) for(let y=-1;y<=1;y++) for(let z=-1;z<=1;z++){
+      const c = makeCubelet(x,y,z);
+      cubeGroup.add(c);
+      cubelets.push(c);
+    }
+
+    // Axis helpers (subtle)
+    const axes = new THREE.AxesHelper(3.4);
+    axes.visible = false; // toggle if you wish
+    cubeGroup.add(axes);
+
+    // ===== Moves =====
+    const isAnimating = { value:false };
+
+    function selectLayer(axis, index){
+      const EPS = 0.001;
+      return cubelets.filter(c=> Math.abs(c.userData.coord[axis] - index) < EPS+0.01 );
+    }
+
+    function roundCoord(v){
+      return Math.round(v);
+    }
+
+    function bakeRotation(group){
+      // Apply group's world rotation to children, then ungroup
+      group.updateMatrixWorld();
+      const parent = group.parent;
+      const kids = [...group.children];
+      kids.forEach(k=>{
+        k.applyMatrix4(group.matrixWorld);
+        // re-parent to parent
+        parent.add(k);
+        // round logical coords
+        const p = k.position;
+        k.position.set(Math.round(p.x), Math.round(p.y), Math.round(p.z));
+        k.rotation.set(0,0,0);
+        // update logical coordinate store
+        k.userData.coord.set(roundCoord(k.position.x), roundCoord(k.position.y), roundCoord(k.position.z));
+      });
+      parent.remove(group);
+    }
+
+    function turn(move, speed=0.22){
+      if(isAnimating.value) return;
+      const prime = move.endsWith("'");
+      const m = prime ? move[0] : move;
+
+      const layer = new THREE.Group();
+      cubeGroup.add(layer);
+
+      let axis='y', index=0, angle= Math.PI/2 * (prime? -1: 1);
+      switch(m){
+        case 'U': axis='y'; index=1; break;
+        case 'D': axis='y'; index=-1; angle*=-1; break; // D is opposite
+        case 'L': axis='x'; index=-1; angle*=-1; break;
+        case 'R': axis='x'; index=1; break;
+        case 'F': axis='z'; index=1; break;
+        case 'B': axis='z'; index=-1; angle*=-1; break;
+      }
+
+      const targets = selectLayer(axis, index);
+      targets.forEach(t=> layer.add(t));
+
+      // set pivot
+      layer.position.set(0,0,0);
+
+      const duration = 340; // ms
+      const start = performance.now();
+      const end = start + duration / speed; // speed <1 is slower, >1 faster
+      isAnimating.value = true;
+
+      const trailBoost = 0.8;
+      const oldDamp = afterimage.uniforms["damp"].value;
+      afterimage.uniforms["damp"].value = Math.max(0.75, oldDamp - trailBoost * 0.12);
+
+      function animate(){
+        const now = performance.now();
+        const t = Math.min(1, (now-start) / (end-start));
+        const e = easeOutCubic(t);
+        if(axis==='x') layer.rotation.x = angle * e;
+        if(axis==='y') layer.rotation.y = angle * e;
+        if(axis==='z') layer.rotation.z = angle * e;
+        if(t<1){ requestAnimationFrame(animate); }
+        else{
+          // snap and bake
+          if(axis==='x') layer.rotation.x = angle;
+          if(axis==='y') layer.rotation.y = angle;
+          if(axis==='z') layer.rotation.z = angle;
+          bakeRotation(layer);
+          isAnimating.value = false;
+          afterimage.uniforms["damp"].value = oldDamp;
+        }
+      }
+      animate();
+    }
+
+    function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+    // Public controls
+    document.querySelectorAll('[data-move]').forEach(btn=>{
+      btn.addEventListener('click',()=> turn(btn.dataset.move));
+    });
+
+    window.addEventListener('keydown', (e)=>{
+      const k = e.key.toUpperCase();
+      const prime = e.shiftKey;
+      if("UDLRFB".includes(k)){
+        turn(k + (prime? "'":""));
+      }
+    });
+
+    // Scramble
+    document.getElementById('scramble').addEventListener('click', ()=>{
+      if(isAnimating.value) return;
+      const seq = [];
+      const moves = ['U','D','L','R','F','B'];
+      const len = 20 + Math.floor(Math.random()*10);
+      for(let i=0;i<len;i++){
+        const m = moves[Math.floor(Math.random()*moves.length)];
+        const p = Math.random()<0.5 ? "'" : '';
+        seq.push(m+p);
+      }
+      // chain them
+      let i = 0;
+      const doNext = ()=>{
+        if(i>=seq.length) return;
+        turn(seq[i]);
+        i++;
+        // poll when animation done
+        const id = setInterval(()=>{
+          if(!isAnimating.value){ clearInterval(id); doNext(); }
+        }, 12);
+      };
+      doNext();
+    });
+
+    // Reset (return to solved)
+    document.getElementById('reset').addEventListener('click', ()=>{
+      if(isAnimating.value) return;
+      cubelets.forEach(c=>{
+        const p = c.userData.coord;
+        c.position.set(p.x, p.y, p.z);
+        c.rotation.set(0,0,0);
+      });
+    });
+
+    // ===== Camera Locking =====
+    const lockToggle = document.getElementById('lockCam');
+    const lockedView = document.getElementById('lockedView');
+
+    function snapTo(view){
+      const dist = controls.getDistance();
+      let pos = new THREE.Vector3();
+      const d = Math.max(7, dist);
+      switch(view){
+        case 'front': pos.set(0,0,d); break;
+        case 'back': pos.set(0,0,-d); break;
+        case 'right': pos.set(d,0,0); break;
+        case 'left': pos.set(-d,0,0); break;
+        case 'up': pos.set(0,d,0); break;
+        case 'down': pos.set(0,-d,0); break;
+      }
+      // Simple tween
+      const start = camera.position.clone();
+      const t0 = performance.now();
+      const T = 420;
+      (function tween(){
+        const t = (performance.now()-t0)/T; const e = easeOutCubic(Math.min(1,t));
+        camera.position.lerpVectors(start, pos, e);
+        camera.lookAt(0,0,0);
+        if(t<1) requestAnimationFrame(tween);
+      })();
+    }
+
+    lockToggle.addEventListener('change', ()=>{
+      if(lockToggle.checked){
+        controls.enableRotate = false;
+        controls.enablePan = false;
+        snapTo(lockedView.value);
+      } else {
+        controls.enableRotate = true;
+        controls.enablePan = true;
+      }
+    });
+    lockedView.addEventListener('change', ()=>{ if(lockToggle.checked) snapTo(lockedView.value); });
+
+    // ===== Animate =====
+    const clock = new THREE.Clock();
+    function render(){
+      const dt = clock.getDelta();
+      dust.rotation.y += dt * 0.02;
+
+      controls.update();
+      if(contrailsToggle.checked){
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
+      requestAnimationFrame(render);
+    }
+    render();
+
+    // ===== Resize =====
+    window.addEventListener('resize', ()=>{
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
